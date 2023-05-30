@@ -5,11 +5,19 @@ import javax.microedition.io.Connector;
 import javax.microedition.io.StreamConnection;
 import javax.microedition.io.StreamConnectionNotifier;
 import java.io.*;
+import java.util.Scanner;
 
 public class Main {
     static final String serverUUID = "0000110100001000800000805F9B34FB";
 
+    static final int TIMEOUT_MILLIS = 500;
+
     public static void main(String[] args) throws IOException, InterruptedException {
+
+//        if (true) {
+//            sendData(new PrintStream(System.out), null);
+//            return;
+//        }
 
         System.identityHashCode(null);
 
@@ -26,34 +34,32 @@ public class Main {
         while (true) {
             StreamConnection connection = server.acceptAndOpen(); // Wait until client connects
             System.out.println("Got new connection");
-            new Thread(() -> {
+            PrintStream writer = new PrintStream(connection.openOutputStream());
+            new Thread(() -> sendData(writer, () -> {
                 try {
-                    BufferedReader scanner = new BufferedReader(new InputStreamReader(connection.openInputStream()));
-                    PrintStream writer = new PrintStream(connection.openOutputStream());
-
-                    String read = scanner.readLine();
-                    while (true) {
-                        if (read != null) {
-                            System.out.println(read);
-                            System.out.println("Received: " + read);
-                            String response = handleToUtf8(read);
-                            System.out.println("Sending: " + response);
-                            writer.println(response);
-                        } else {
-                            Thread.sleep(100);
-                        }
-                        read = scanner.readLine();
-                    }
-                } catch (Exception e) {
+                    connection.close();
+                } catch (IOException e) {
                     throw new RuntimeException(e);
-                } finally {
-                    try {
-                        connection.close();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
                 }
-            }).start();
+            })).start();
+        }
+    }
+
+    private static void sendData(PrintStream writer, Runnable finallyTask) {
+        try {
+            Scanner scanner = new Scanner(new File("data.txt"));
+            scanner.nextLine();
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                String[] splitted = scanner.nextLine().split(",");
+                Thread.sleep(TIMEOUT_MILLIS);
+                writer.println(line);
+                System.out.println("Sent: " + line);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (finallyTask != null) finallyTask.run();
         }
     }
 
